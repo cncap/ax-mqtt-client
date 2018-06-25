@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/icon/button">
+        <file>resources/delete.png</file>
+        <file>resources/disk.png</file>
+        <file>resources/connect.png</file>
+    </qresource>
+</RCC>
