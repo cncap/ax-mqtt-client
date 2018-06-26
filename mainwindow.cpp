@@ -30,17 +30,13 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(m_client, &QMqttClient::stateChanged, this, &MainWindow::stateChanged);
 //    connect(m_client, &QMqttClient::disconnected, this, &MainWindow::brokerDisconnected);
 
-    connect(m_client, &QMqttClient::messageSent, this, [this](qint32 id){
-        console(tr("Message sent: %1").arg(id));
+    connect(this, &MainWindow::messageSent, this, [this](const QString& topic, qint32 id){
+        console(tr("Sent: %1, id: %2").arg(topic).arg(id));
     });
+
     connect(m_client, &QMqttClient::messageReceived, this, [this](const QByteArray &message, const QMqttTopicName &topic) {
-        console(tr("Received Topic: ").toUtf8()
-                + topic.name()
-                + tr("Message: ").toUtf8()
-                + message);
+        console(tr("Received: %1, Message:\n %2 ").arg(topic.name()).arg(message.data()));
     });
-
-
 
     connect(ui->lineEditHost, &QLineEdit::textChanged, m_client, &QMqttClient::setHostname);
     connect(ui->lineEditClientId, &QLineEdit::textChanged, m_client, &QMqttClient::setClientId);
@@ -141,17 +137,27 @@ void MainWindow::stateChanged(int state)
         ui->checkBoxCleanSession->setEnabled(false);
         ui->checkBoxRetained->setEnabled(false);
         ui->comboBoxVersion->setEnabled(false);
-        statusBar()->showMessage(tr("Connecting to %1...").arg(ui->lineEditHost->text()), 0);
-        console(tr("Connecting to %1...").arg(ui->lineEditHost->text()));
+        statusBar()->showMessage(tr("Connecting to %1...").arg(m_client->hostname()), 0);
+        console(tr("Connecting to %1...").arg(m_client->hostname()));
         break;
     case QMqttClient::Connected:
         // subscribe saved topic
+        // todo: save and restore subscribes with qos.
         foreach (QString t, subs) {
-            m_client->subscribe(t);
+            if(!m_client->subscribe(t)){
+                console(tr("An error occurs when subscribing to %1").arg(t));
+            }else{
+                console(tr("Subcribed: %1").arg(t));
+            }
         }
+
         ui->buttonConnect->setText(tr("Disconnect").toUtf8());
         ui->buttonPublish->setEnabled(true);
         ui->buttonSubscribe->setEnabled(true);
+        ui->checkBoxRetained->setEnabled(true);
+        ui->comboBoxPubQos->setEnabled(true);
+        ui->comboBoxSubQos->setEnabled(true);
+
         statusBar()->showMessage("Connected", 0);
         console(tr("Connected"));
         break;
@@ -159,6 +165,9 @@ void MainWindow::stateChanged(int state)
         ui->buttonPublish->setEnabled(false);
         ui->buttonSubscribe->setEnabled(false);
         ui->buttonUnsubscribe->setEnabled(false);
+        ui->checkBoxRetained->setEnabled(false);
+        ui->comboBoxPubQos->setEnabled(false);
+        ui->comboBoxSubQos->setEnabled(false);
 
         ui->buttonConnect->setText(tr("Connect").toUtf8());
         ui->comboBoxSettings->setEnabled(true);
@@ -174,12 +183,9 @@ void MainWindow::stateChanged(int state)
         ui->lineEditPassword->setEnabled(true);
         ui->lineEditUsername->setEnabled(true);
         ui->checkBoxCleanSession->setEnabled(true);
-        ui->checkBoxRetained->setEnabled(true);
         ui->comboBoxVersion->setEnabled(true);
         statusBar()->showMessage("Disconnected", 0);
         console(tr("Disconnected"));
-        break;
-    default:
         break;
     }
 
@@ -191,15 +197,17 @@ void MainWindow::stateChanged(int state)
  */
 void MainWindow::on_buttonPublish_clicked()
 {
-    int ret = m_client->publish(ui->lineEditPubTopic->text(),
+    QString topic = ui->lineEditPubTopic->text();
+    qint32 ret = m_client->publish(ui->lineEditPubTopic->text(),
                                 ui->lineEditPubMessage->toPlainText().toUtf8(),
-                                ui->comboBoxQos->currentIndex(),
+                                ui->comboBoxPubQos->currentIndex(),
                                 ui->checkBoxRetained->isChecked()
                                 );
-    if ( ret <0){
+    if (ret <0){
         console("Could not publish message.");
+        return;
     }else{
-        console("Publish message successful.");
+        emit messageSent(topic, ret);
     }
 }
 
@@ -210,10 +218,12 @@ void MainWindow::on_buttonPublish_clicked()
 void MainWindow::on_buttonSubscribe_clicked()
 {
     QString t = ui->lineEditSubTopic->text();
-    auto subscription = m_client->subscribe(t);
+    int o = ui->comboBoxSubQos->currentIndex();
+    auto subscription = m_client->subscribe(t, o);
     if (!subscription) {
         console("Could not subscribe. Is there a valid connection?");
     }else{
+        console(tr("Subcribed: %1").arg(t));
         if(ui->listWidgetSubs->findItems(t, Qt::MatchExactly).count()==0){
             ui->listWidgetSubs->addItem(t);
         }
@@ -307,12 +317,13 @@ void MainWindow::saveSetting()
         app.setValue("keep_alive", ui->spinBoxKeepAlive->value());
         app.setValue("clean_session", ui->checkBoxCleanSession->isChecked());
 
-        app.setValue("qos", ui->comboBoxQos->currentIndex());
         app.setValue("retained", ui->checkBoxRetained->isChecked());
         app.setValue("pub_topic", ui->lineEditPubTopic->text());
+        app.setValue("pub_qos", ui->comboBoxPubQos->currentIndex());
         app.setValue("pub_message", ui->lineEditPubMessage->document()->toPlainText());
 
         app.setValue("sub_topic", ui->lineEditSubTopic->text());
+        app.setValue("sub_qos", ui->comboBoxSubQos->currentIndex());
         app.setValue("sub_topics", subsString.join(','));
         app.endGroup();
 
@@ -348,7 +359,6 @@ void MainWindow::loadSetting(QString setting)
         ui->lineEditSetting->setText(setting);
         console("Load setting: " + setting);
     }
-    qDebug()<< setting;
     QSettings app("Aiotx", "MClientSetting");
     app.beginGroup(setting);
 
@@ -362,12 +372,13 @@ void MainWindow::loadSetting(QString setting)
     us.username = app.contains("username") ? app.value("username").toString(): defus.username;
     us.password = app.contains("password") ? app.value("password").toString(): defus.password;
 
-    us.qos = app.contains("qos") ? app.value("qos").toInt(): defus.qos;
+    us.pub_qos = app.contains("pub_qos") ? app.value("pub_qos").toInt(): defus.pub_qos;
     us.retained = app.contains("retained") ? app.value("retained").toBool() : defus.retained;
     us.pub_topic = app.contains("pub_topic") ? app.value("pub_topic").toString() : defus.pub_topic;
     us.pub_message = app.contains("pub_message") ? app.value("pub_message").toString() : defus.pub_message;
 
     us.sub_topic = app.contains("sub_topic") ? app.value("sub_topic").toString() : defus.sub_topic;
+    us.sub_qos = app.contains("sub_qos") ? app.value("sub_qos").toInt(): defus.sub_qos;
     us.sub_topics = app.contains("sub_topics") ? app.value("sub_topics").toString() : defus.sub_topics;
     app.endGroup();
 
@@ -392,7 +403,8 @@ void MainWindow::loadSetting(QString setting)
     ui->lineEditHost->setText(us.address);
     ui->checkBoxCleanSession->setChecked(us.clean_session);
 
-    ui->comboBoxQos->setCurrentIndex(us.qos);
+    ui->comboBoxPubQos->setCurrentIndex(us.pub_qos);
+    ui->comboBoxSubQos->setCurrentIndex(us.sub_qos);
     ui->checkBoxRetained->setChecked(us.retained);
     ui->lineEditPubTopic->setText(us.pub_topic);
     ui->lineEditPubMessage->setPlainText(us.pub_message);

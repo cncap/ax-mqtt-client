@@ -26,10 +26,11 @@ struct UserSetting
 
     QString pub_topic="";
     QString pub_message="";
-    int qos = 0;
+    int pub_qos = 0;
     bool retained = false;
 
     QString sub_topic = "";
+    int sub_qos = 0;
     QString sub_topics ="------- Subscribed -------";
 };
 
@@ -44,6 +45,9 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+signals:
+    void messageSent(const QString& topic, qint32 id);
 
 private slots:
 
