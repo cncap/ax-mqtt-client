@@ -421,7 +421,7 @@ void MainWindow::loadSetting(QString setting)
  */
 void MainWindow::on_actionAbout_triggered()
 {
-    QMessageBox::information(this,tr("About"), tr("Author: Chn.vmax@gmail.com \nLicense: GNU GPLv2"), QMessageBox::Close );
+    QMessageBox::information(this,tr("About"), tr("License: GNU GPLv2 \nAuthor: Chn.vmax@gmail.com \nHttp://www.aiotx.com"), QMessageBox::Close );
 }
 
 /**
