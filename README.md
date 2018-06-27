@@ -18,4 +18,4 @@ The mqtt client library that this program relies on is the newly added module in
 
 # License
 
-GNU General Public License v2.0
+GNU General Public License v3.0

@@ -3,6 +3,7 @@
 # Project created by QtCreator 2018-06-14T10:52:57
 #
 #-------------------------------------------------
+VERSION = 1.0.0
 
 QT       += core gui network mqtt
 
@@ -21,7 +22,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # In order to do so, uncomment the following line.
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
-
+RC_FILE = version.rc
 
 SOURCES += \
         main.cpp \

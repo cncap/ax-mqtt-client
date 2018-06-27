@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    MainWindow::setWindowTitle(tr("MQTT Client V1.3"));
+    MainWindow::setWindowTitle(tr("AiotxMClient v1.0.0"));
 
     //Initialization
     ui->comboBoxVersion->addItem("v3.1", QMqttClient::ProtocolVersion::MQTT_3_1);
@@ -421,7 +421,7 @@ void MainWindow::loadSetting(QString setting)
  */
 void MainWindow::on_actionAbout_triggered()
 {
-    QMessageBox::information(this,tr("About"), tr("License: GNU GPLv2 \nAuthor: Chn.vmax@gmail.com \nHttp://www.aiotx.com"), QMessageBox::Close );
+    QMessageBox::information(this,tr("About"), tr("License: GNU GPLv3 \nAuthor: Chn.vmax@gmail.com \nHttp://www.aiotx.com"), QMessageBox::Close );
 }
 
 /**
